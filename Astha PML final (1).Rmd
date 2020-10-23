@@ -1,0 +1,112 @@
+---
+title: "Practical Machine Leaarning peer graded"
+author: "Astha Agarwal"
+date: "10/23/2020"
+output:
+  word_document: default
+  html_document: default
+---
+
+Background
+----------
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The goal of this project is to predict the manner in which they did the exercise. This is the `classe` variable in the training set, considering any of the other variables as predictors.
+
+
+
+
+
+
+```{r}
+library(caret)
+library(knitr)
+library(data.table)
+library(rpart.plot)
+library(rpart)
+library(gbm)
+library(ggplot2)
+library(corrplot)
+```
+
+Exploring and cleaning the data.
+
+```{r}
+TU <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+taU  <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+ts <- read.csv(url(TU))
+dt <- read.csv(url(taU))
+```
+
+ cleaning the data.
+```{r}
+tdt <- dt[, colSums(is.na(dt)) == 0]
+TD <- ts[, colSums(is.na(ts)) == 0]
+```
+
+now predicting
+
+```{r}
+tdt <- tdt[, -c(1:7)]
+TD <- TD[, -c(1:7)]
+dim(tdt)
+```
+now we are deleting the variables that are non-zero referred to as 'nz' in this code
+```{r}
+set.seed(1234)
+dtran <- createDataPartition(dt$classe, p = 0.7, list = FALSE)
+tdt <- tdt[dtran, ]
+TD <- tdt[-dtran, ]
+dim(tdt)
+dim(TD)
+```
+coercing
+```{r}
+nZ <- nearZeroVar(tdt)
+tdt <- tdt[, -nZ]
+TD <- TD[, -nZ]
+dim(tdt)
+dim(TD)
+```
+
+```{r}
+p_c <- cor(tdt[, -53])
+corrplot(p_c, order = "FPC", method = "color", type = "upper", tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+```
+the corr. predic. are with the dark colour intersec.This is the observation in this case.
+
+Next step is the building of our model for the dataset we are using.
+
+
+```{r}
+set.seed(20000)
+tr <- rpart(classe ~ ., data=tdt, method = "class")
+rpart.plot(tr)
+```
+ Prepare data partition, for later validation
+```{r}
+mdp <- predict(tr, TD, type = "class")
+ab <- confusionMatrix(mdp, TD$classe)
+ab
+```
+
+```{r}
+plot(mdp)
+```
+
+Lets apply two models in this case:
+First is General boosted model.
+Second is gbm model.
+
+```{r}
+set.seed(10000)
+cand_gbm <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+val <- train(classe ~ .,data=tdt, method = "gbm", trControl = cand_gbm, verbose = FALSE)
+val$finalModel
+```
+From the results, it appears that the random forest model has the best accuracy for testing dataset.
+
+Conclusion
+----------
+
+We can conclude by saying that RandomForest gives more accurate results than Decision Tree. Finally, I chosed the random forest model to the testing dataset for submission result.
